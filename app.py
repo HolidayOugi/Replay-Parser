@@ -14,6 +14,9 @@ from modules.download import download_files
 from modules.battles import load_battle
 from modules.players import load_players
 
+sns.set(rc={'ytick.labelcolor': 'white', 'xtick.labelcolor': 'white'})
+sns.set(rc={'axes.facecolor': '#0000FF', 'figure.facecolor': (0, 0, 0, 0)})
+
 st.set_page_config(page_title='Replay Parser', initial_sidebar_state="collapsed", layout='wide')
 
 
@@ -115,11 +118,14 @@ def load_heatmap(row, format_df, selected_mode, selected_format):
 
         pivot_df = pivot_df.reindex(weekday_order)
         pivot_df = pivot_df[hour_bin_order]
+        pivot_df = pivot_df.fillna(0)
 
         fig, ax = plt.subplots(figsize=(12, 6))
 
+
+
         sns.heatmap(
-            pivot_df,
+            pivot_df.astype(int),
             annot=True,
             fmt="d",
             cmap='YlOrRd',
