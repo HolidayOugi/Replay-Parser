@@ -1,0 +1,10 @@
+pandas
+streamlit
+pillow
+tabulate
+matplotlib
+seaborn
+tqdm
+numpy
+plotly
+requests
