@@ -391,9 +391,8 @@ if selected_player:
     if "loaded_player" not in st.session_state or st.session_state.loaded_player != selected_player:
         if os.path.exists(output_dir):
             shutil.rmtree(output_dir)
-        for fmt in formats:
-            with st.spinner(f"🔄 Downloading replays of {fmt}..."):
-                download_files(fmt, selected_player, replay_dir)
+        with st.spinner("🔄 Downloading replays..."):
+            download_files(formats, selected_player, replay_dir)
         load_battle(replay_dir, tiers_dir)
         if os.path.exists(replay_dir):
             shutil.rmtree(replay_dir)
