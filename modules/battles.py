@@ -157,6 +157,17 @@ def load_battle(input_folder, output_folder, selected_player):
             else:
                 matches = difflib.get_close_matches(selected_player, common_players, n=1, cutoff=0)
                 player_name = matches[0] if matches else next(iter(common_players))
+        else:
+            player1_counts = df['player1'].value_counts()
+            player2_counts = df['player2'].value_counts()
+
+            total_counts = player1_counts.add(player2_counts, fill_value=0)
+
+            if not total_counts.empty:
+                player_name = total_counts.idxmax()
+            else:
+                player_name = None
+
 
         print(f"Selected player: {player_name}")
 

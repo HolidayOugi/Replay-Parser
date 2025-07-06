@@ -106,7 +106,7 @@ def download_files(readable_format, player, output_dir, max_replays):
                             new_found = True
                             futures.append(executor.submit(download_replay, replay_id, format_dir))
 
-                for _ in tqdm(futures, desc=f"Scaricando replays {readable_format}", leave=False):
+                for _ in tqdm(futures, desc=f"Downloading replays {readable_format}", leave=False):
                     _.result()
 
             if not new_found:
