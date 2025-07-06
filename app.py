@@ -32,16 +32,17 @@ def get_player_data(file_path, selected_player):
     players_df = pd.read_parquet(file_path)
     players_df['pokemon_used'] = players_df['pokemon_used'].apply(eval)
 
-    if "name" in players_df.columns and selected_player in players_df["name"].values:
+    names_lower = players_df["name"].str.lower()
+    if selected_player.lower() in names_lower.values:
         return players_df
     return None
 
 @st.cache_data
 def load_player(players_df, selected_player, selected_format, tiers_dir):
     if 'list_name' in players_df.columns:
-        row = players_df[players_df['list_name'] == selected_player].iloc[0]
+        row = players_df[players_df['list_name'].str.lower() == selected_player.lower()].iloc[0]
     else:
-        row = players_df[players_df['name'] == selected_player].iloc[0]
+        row = players_df[players_df['name'].str.lower() == selected_player.lower()].iloc[0]
     df_path = f'{tiers_dir}/{selected_format}.parquet'
     if os.path.exists(df_path):
         format_df = pd.read_parquet(df_path)
@@ -278,7 +279,9 @@ def load_player_graphs(row, selected_player, selected_format):
 
     rating_list = row['rating_list']
 
-    if rating_list is not None and rating_list.size > 0:
+    rating_list = np.array(rating_list)
+
+    if rating_list.size > 0 and not pd.isna(rating_list).any():
         if isinstance(rating_list, (list, np.ndarray)):
             match_range = list(range(1, len(rating_list) + 1))
         else:
@@ -291,7 +294,7 @@ def load_player_graphs(row, selected_player, selected_format):
         df_rating['Smoothed Rating'] = df_rating['Rating'].rolling(window=20, min_periods=1).mean()
 
         fig = px.line(df_rating, x='Match', y='Smoothed Rating',
-                      title=f"Rating history for {selected_player} in {selected_format}",
+                      title=f"Rating history for {row['name']} in {selected_format}",
                       markers=False)
 
         st.plotly_chart(fig, use_container_width=True, key=f"{key}_rating")
@@ -300,10 +303,10 @@ def load_player_graphs(row, selected_player, selected_format):
 
 
 
-def load_single_player(selected_player, parquet_dir, tiers_dir):
+def load_single_player(selected_player, loaded_player, parquet_dir, tiers_dir):
     if os.path.exists(parquet_dir):
         st.markdown("### Player Analysis")
-        for file in os.listdir(parquet_dir):
+        for file in sorted(os.listdir(parquet_dir)):
             if file.endswith("_players.parquet"):
                 file_path = os.path.join(parquet_dir, file)
                 players_df = get_player_data(file_path, selected_player)
@@ -311,7 +314,7 @@ def load_single_player(selected_player, parquet_dir, tiers_dir):
 
                     selected_format = file.replace("_players.parquet", "")
                     with st.expander(f"{selected_format}"):
-                        st.subheader(f"Stats for {selected_player} in {selected_format}")
+                        st.subheader(f"Stats for {loaded_player} in {selected_format}")
 
                         col1, sep, col2 = st.columns([10, 1, 10])
                         key = f"{selected_player} ({selected_format})"
@@ -389,7 +392,8 @@ os.makedirs(user_dir, exist_ok=True)
 
 selected_player = st.text_input("Search for a player", value="", placeholder="Enter player name")
 
-parquet_dir = f'./{user_dir}/output/players'
+
+
 output_dir = f'./{user_dir}/output'
 replay_dir=f'./{user_dir}/output/replays'
 tiers_dir=f'./{user_dir}/output/tiers'
@@ -400,20 +404,42 @@ format_file = './assets/formats.txt'
 with open(format_file, 'r') as f:
     formats = [line.strip() for line in f if line.strip()]
 
-if selected_player:
-    if "loaded_player" not in st.session_state or st.session_state.loaded_player != selected_player:
-        if os.path.exists(output_dir):
-            shutil.rmtree(output_dir)
-        with st.spinner("🔄 Downloading all replays..."):
-            for fmt in formats:
-                with st.spinner(f"🔄 Downloading replays in {fmt}..."):
-                    download_files(fmt, selected_player, replay_dir)
-        load_battle(replay_dir, tiers_dir)
-        if os.path.exists(replay_dir):
-            shutil.rmtree(replay_dir)
-        load_players(formats, tiers_dir, players_dir)
-        st.session_state.loaded_player = selected_player
+selected_formats = st.multiselect(
+    "Select Formats:",
+    options=formats,
+    default=[]
+)
 
-    load_single_player(selected_player, players_dir, tiers_dir)
+num_replay = st.number_input(
+    "# Replays to Download",
+    min_value=1,
+    max_value=5000,
+    value=1000,
+    step=1
+)
+
+
+if st.button("Start"):
+
+
+    if selected_player:
+        if "loaded_player" not in st.session_state or st.session_state.loaded_player != selected_player:
+            if os.path.exists(output_dir):
+                shutil.rmtree(output_dir)
+            with st.spinner("🔄 Downloading all replays..."):
+                for fmt in selected_formats:
+                    with st.spinner(f"🔄 Downloading replays in {fmt}..."):
+                        download_files(fmt, selected_player, replay_dir, num_replay)
+
+            with st.spinner("🔄 Generating stats..."):
+                parsed_player = load_battle(replay_dir, tiers_dir, selected_player)
+            if os.path.exists(replay_dir):
+                shutil.rmtree(replay_dir)
+            load_players(formats, tiers_dir, players_dir)
+            st.session_state.loaded_player = selected_player
+            st.session_state.parsed_player = parsed_player
+
+        print(f"Player {selected_player} loaded with ID: {st.session_state.parsed_player}")
+        load_single_player(st.session_state.parsed_player, selected_player, players_dir, tiers_dir)
 
 

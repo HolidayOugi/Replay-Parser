@@ -5,8 +5,10 @@ from urllib.parse import quote
 from tqdm import tqdm
 from concurrent.futures import ThreadPoolExecutor
 import re
+import math
+import streamlit as st
 
-def download_files(readable_format, player, output_dir):
+def download_files(readable_format, player, output_dir, max_replays):
     OUTPUT_BASE_DIR = output_dir
     MAX_WORKERS = 10
 
@@ -45,16 +47,36 @@ def download_files(readable_format, player, output_dir):
         except:
             return
 
-    def process_player_format(player, raw_format, readable_format):
+    def process_player_format(player, raw_format, readable_format, max_replays):
         format_dir = os.path.join(OUTPUT_BASE_DIR, readable_format)
         os.makedirs(format_dir, exist_ok=True)
+        placeholder = st.empty()
 
-        for page in range(1, 101):
+        max_page = math.ceil(max_replays / 50)
+
+        num_replays = 0
+
+        max_valid_page = 0
+
+
+        for page in range(1, max_page+1):
             encoded_player = quote(player)
             url = f"https://replay.pokemonshowdown.com/search.json?user={encoded_player}&format={raw_format}&page={page}"
             text = fetch(url)
-            if not text:
-                return
+            if not text or text == "[]":
+                break
+
+            else:
+                max_valid_page += 1
+
+
+        progress_bar = placeholder.progress(0)
+        for page in range(1, max_valid_page+1):
+            encoded_player = quote(player)
+            url = f"https://replay.pokemonshowdown.com/search.json?user={encoded_player}&format={raw_format}&page={page}"
+            text = fetch(url)
+            if not text or text == "[]":
+                break
 
             try:
                 data = json.loads(text)
@@ -67,6 +89,11 @@ def download_files(readable_format, player, output_dir):
                 replays = data
             else:
                 replays = []
+
+            if num_replays + len(replays) > max_replays:
+                replays = replays[:max_replays - num_replays]
+
+            num_replays += len(replays)
 
             new_found = False
             with ThreadPoolExecutor(max_workers=MAX_WORKERS) as executor:
@@ -84,6 +111,8 @@ def download_files(readable_format, player, output_dir):
 
             if not new_found:
                 return
+            progress_bar.progress(int(page / max_valid_page * 100))
+        placeholder.empty()
 
     def get_raw_format(readable_format):
         match = re.match(r"\[Gen (\d+)\]\s+([A-Z]+)", readable_format)
@@ -97,4 +126,4 @@ def download_files(readable_format, player, output_dir):
 
     raw_format = get_raw_format(readable_format)
     if raw_format:
-        process_player_format(player, raw_format, readable_format)
+        process_player_format(player, raw_format, readable_format, max_replays)

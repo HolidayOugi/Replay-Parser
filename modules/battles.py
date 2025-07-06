@@ -4,8 +4,9 @@ import os
 from tqdm import tqdm
 import numpy as np
 import json
+import difflib
 
-def load_battle(input_folder, output_folder):
+def load_battle(input_folder, output_folder, selected_player):
 
     def parse_log(log_text):
         lines = log_text.splitlines()
@@ -147,6 +148,18 @@ def load_battle(input_folder, output_folder):
         df['player1'] = df['players'].apply(lambda x: x[0] if len(x) > 0 else None)
         df['player2'] = df['players'].apply(lambda x: x[1] if len(x) > 1 else None)
 
+        sets_of_players = df.apply(lambda row: {row['player1'].lower(), row['player2'].lower()}, axis=1)
+        common_players = set.intersection(*sets_of_players)
+        player_name = None
+        if common_players:
+            if len(common_players) == 1:
+                player_name = common_players.pop()
+            else:
+                matches = difflib.get_close_matches(selected_player, common_players, n=1, cutoff=0)
+                player_name = matches[0] if matches else next(iter(common_players))
+
+        print(f"Selected player: {player_name}")
+
         parsed = df['log'].progress_map(parse_log)
         df_new = pd.DataFrame(parsed.tolist(),
                               columns=['Winner', 'Forfeit', 'Team 1', 'Team 2', 'Turns', '# Switches 1', '# Switches 2'])
@@ -160,3 +173,5 @@ def load_battle(input_folder, output_folder):
         output_path = os.path.join(output_folder, output_filename)
 
         df.to_parquet(output_path, index=False)
+
+    return player_name

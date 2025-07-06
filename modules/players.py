@@ -3,8 +3,8 @@ import os
 from collections import defaultdict, Counter
 import json
 import numpy as np
-import glob
 from tqdm import tqdm
+
 
 
 def load_players(formats, input_folder, output_folder):
