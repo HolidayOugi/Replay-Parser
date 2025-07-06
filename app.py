@@ -418,8 +418,12 @@ num_replay = st.number_input(
     step=1
 )
 
+click = st.button("Start")
 
-if st.button("Start"):
+if click or (
+    "loaded_player" in st.session_state and
+    st.session_state.loaded_player == selected_player
+):
 
 
     if selected_player:
@@ -436,8 +440,8 @@ if st.button("Start"):
             if os.path.exists(replay_dir):
                 shutil.rmtree(replay_dir)
             load_players(formats, tiers_dir, players_dir)
-            st.session_state.loaded_player = selected_player
             st.session_state.parsed_player = parsed_player
+            st.session_state.loaded_player = selected_player
 
         print(f"Player {selected_player} loaded with ID: {st.session_state.parsed_player}")
         load_single_player(st.session_state.parsed_player, selected_player, players_dir, tiers_dir)
