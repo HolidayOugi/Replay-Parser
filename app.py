@@ -7,6 +7,7 @@ import plotly.express as px
 import plotly.graph_objects as go
 import os
 import glob
+import uuid
 import numpy as np
 import shutil
 from modules.download import download_files
@@ -33,17 +34,17 @@ def get_player_data(file_path, selected_player):
     return None
 
 @st.cache_data
-def load_player(players_df, selected_player, selected_format):
+def load_player(players_df, selected_player, selected_format, tiers_dir):
     if 'list_name' in players_df.columns:
         row = players_df[players_df['list_name'] == selected_player].iloc[0]
     else:
         row = players_df[players_df['name'] == selected_player].iloc[0]
-    df_path = f'./output/tiers/{selected_format}.parquet'
+    df_path = f'{tiers_dir}/{selected_format}.parquet'
     if os.path.exists(df_path):
         format_df = pd.read_parquet(df_path)
 
     else:
-        pattern = glob.escape(f'./output/tiers/{selected_format}') + "_*.parquet"
+        pattern = glob.escape(f'{tiers_dir}/{selected_format}') + "_*.parquet"
         parts = sorted(glob.glob(pattern))
 
         if parts:
@@ -293,7 +294,7 @@ def load_player_graphs(row, selected_player, selected_format):
 
 
 
-def load_single_player(selected_player, parquet_dir):
+def load_single_player(selected_player, parquet_dir, tiers_dir):
     if os.path.exists(parquet_dir):
         st.markdown("### Player Analysis")
         for file in os.listdir(parquet_dir):
@@ -309,7 +310,7 @@ def load_single_player(selected_player, parquet_dir):
                         col1, sep, col2 = st.columns([10, 1, 10])
                         key = f"{selected_player} ({selected_format})"
                         with col1:
-                            row, matches_df = load_player(players_df, selected_player, selected_format)
+                            row, matches_df = load_player(players_df, selected_player, selected_format, tiers_dir)
                             selected_mode = st.selectbox('Choose a visualization mode', ['Separated', 'Combined'],
                                                          key=f"{key}_mode")
                             load_heatmap(row, matches_df, selected_mode, selected_format)
@@ -374,13 +375,19 @@ def load_single_player(selected_player, parquet_dir):
 
 st.header("Players Search")
 
+if "user_id" not in st.session_state:
+    st.session_state.user_id = str(uuid.uuid4())
+
+user_dir = os.path.join("user_data", st.session_state.user_id)
+os.makedirs(user_dir, exist_ok=True)
+
 selected_player = st.text_input("Search for a player", value="", placeholder="Enter player name")
 
-parquet_dir = './output/players'
-output_dir = './output'
-replay_dir='./output/replays'
-tiers_dir='./output/tiers'
-players_dir ='./output/players'
+parquet_dir = f'./{user_dir}/output/players'
+output_dir = f'./{user_dir}/output'
+replay_dir=f'./{user_dir}/output/replays'
+tiers_dir=f'./{user_dir}/output/tiers'
+players_dir =f'./{user_dir}/output/players'
 
 format_file = './assets/formats.txt'
 
@@ -391,14 +398,16 @@ if selected_player:
     if "loaded_player" not in st.session_state or st.session_state.loaded_player != selected_player:
         if os.path.exists(output_dir):
             shutil.rmtree(output_dir)
-        with st.spinner("🔄 Downloading replays..."):
-            download_files(formats, selected_player, replay_dir)
+        with st.spinner("🔄 Downloading all replays..."):
+            for fmt in formats:
+                with st.spinner(f"🔄 Downloading replays in {fmt}..."):
+                    download_files(fmt, selected_player, replay_dir)
         load_battle(replay_dir, tiers_dir)
         if os.path.exists(replay_dir):
             shutil.rmtree(replay_dir)
         load_players(formats, tiers_dir, players_dir)
         st.session_state.loaded_player = selected_player
 
-    load_single_player(selected_player, players_dir)
+    load_single_player(selected_player, players_dir, tiers_dir)
 
 

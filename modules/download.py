@@ -6,7 +6,7 @@ from tqdm import tqdm
 from concurrent.futures import ThreadPoolExecutor
 import re
 
-def download_files(formats, player, output_dir):
+def download_files(readable_format, player, output_dir):
     OUTPUT_BASE_DIR = output_dir
     MAX_WORKERS = 10
 
@@ -95,8 +95,6 @@ def download_files(formats, player, output_dir):
             return None
         return f"gen{gen}{tier_map_reverse[tier]}"
 
-    for readable_format in formats:
-        raw_format = get_raw_format(readable_format)
-        if not raw_format:
-            continue
+    raw_format = get_raw_format(readable_format)
+    if raw_format:
         process_player_format(player, raw_format, readable_format)
