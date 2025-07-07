@@ -303,82 +303,88 @@ def load_player_graphs(row, selected_player, selected_format):
 
 
 
-def load_single_player(selected_player, loaded_player, parquet_dir, tiers_dir):
-    if os.path.exists(parquet_dir):
+def load_single_player(selected_player, loaded_player, parquet_dir, tiers_dir, selected_formats):
+
+    formats_files = [fmt + "_players.parquet" for fmt in selected_formats]
+    download_files = sorted(os.listdir(parquet_dir))
+    download_files = [fmt for fmt in download_files if fmt in formats_files]
+
+    if os.path.exists(parquet_dir) and download_files:
         st.markdown("### Player Analysis")
-        for file in sorted(os.listdir(parquet_dir)):
+        for file in download_files:
             if file.endswith("_players.parquet"):
                 file_path = os.path.join(parquet_dir, file)
                 players_df = get_player_data(file_path, selected_player)
                 if players_df is not None:
 
                     selected_format = file.replace("_players.parquet", "")
-                    with st.expander(f"{selected_format}"):
-                        st.subheader(f"Stats for {loaded_player} in {selected_format}")
+                    if selected_format in selected_formats:
+                        with st.expander(f"{selected_format}"):
+                            st.subheader(f"Stats for {loaded_player} in {selected_format}")
 
-                        col1, sep, col2 = st.columns([10, 1, 10])
-                        key = f"{selected_player} ({selected_format})"
-                        with col1:
-                            row, matches_df = load_player(players_df, selected_player, selected_format, tiers_dir)
-                            selected_mode = st.selectbox('Choose a visualization mode', ['Separated', 'Combined'],
-                                                         key=f"{key}_mode")
-                            load_heatmap(row, matches_df, selected_mode, selected_format)
+                            col1, sep, col2 = st.columns([10, 1, 10])
+                            key = f"{selected_player} ({selected_format})"
+                            with col1:
+                                row, matches_df = load_player(players_df, selected_player, selected_format, tiers_dir)
+                                selected_mode = st.selectbox('Choose a visualization mode', ['Separated', 'Combined'],
+                                                             key=f"{key}_mode")
+                                load_heatmap(row, matches_df, selected_mode, selected_format)
 
-                        with sep:
-                            st.markdown("<div style='border-left: 1px solid #ccc; height: 100%;'></div>",
-                                        unsafe_allow_html=True)
+                            with sep:
+                                st.markdown("<div style='border-left: 1px solid #ccc; height: 100%;'></div>",
+                                            unsafe_allow_html=True)
 
-                        with col2:
-                            load_player_graphs(row, selected_player, selected_format)
+                            with col2:
+                                load_player_graphs(row, selected_player, selected_format)
 
-                        col1, sep, col2 = st.columns([10, 1, 10])
+                            col1, sep, col2 = st.columns([10, 1, 10])
 
-                        with col1:
-                            load_pokemon(row, selected_format)
+                            with col1:
+                                load_pokemon(row, selected_format)
 
-                        with sep:
-                            st.markdown("<div style='border-left: 1px solid #ccc; height: 100%;'></div>",
-                                        unsafe_allow_html=True)
+                            with sep:
+                                st.markdown("<div style='border-left: 1px solid #ccc; height: 100%;'></div>",
+                                            unsafe_allow_html=True)
 
-                        with col2:
-                            st.subheader(f"Replays of {row['name']} in {selected_format}")
+                            with col2:
+                                st.subheader(f"Replays of {row['name']} in {selected_format}")
 
-                            subcol1, subcol2 = st.columns(2)
-                            with subcol2:
+                                subcol1, subcol2 = st.columns(2)
+                                with subcol2:
 
-                                min_date = matches_df["uploadtime"].min().date()
-                                max_date = matches_df["uploadtime"].max().date()
+                                    min_date = matches_df["uploadtime"].min().date()
+                                    max_date = matches_df["uploadtime"].max().date()
 
-                                selected_dates = st.date_input(
-                                    "Dates",
-                                    value=(min_date, max_date),
-                                    min_value=min_date,
-                                    max_value=max_date,
-                                    label_visibility="collapsed"
-                                )
+                                    selected_dates = st.date_input(
+                                        "Dates",
+                                        value=(min_date, max_date),
+                                        min_value=min_date,
+                                        max_value=max_date,
+                                        label_visibility="collapsed"
+                                    )
 
-                                if len(selected_dates) == 1:
-                                    start_date = selected_dates[0]
-                                    end_date = max_date
-                                elif len(selected_dates) == 0:
-                                    start_date = min_date
-                                    end_date = max_date
-                                else:
-                                    start_date, end_date = selected_dates
+                                    if len(selected_dates) == 1:
+                                        start_date = selected_dates[0]
+                                        end_date = max_date
+                                    elif len(selected_dates) == 0:
+                                        start_date = min_date
+                                        end_date = max_date
+                                    else:
+                                        start_date, end_date = selected_dates
 
-                            with subcol1:
+                                with subcol1:
 
-                                replay_df = load_replays(matches_df, start_date, end_date)
+                                    replay_df = load_replays(matches_df, start_date, end_date)
 
-                                st.write(
-                                    replay_df.head(st.session_state.rows_shown).to_markdown(index=False),
-                                    unsafe_allow_html=True
-                                )
+                                    st.write(
+                                        replay_df.head(st.session_state.rows_shown).to_markdown(index=False),
+                                        unsafe_allow_html=True
+                                    )
 
-                                if st.session_state.rows_shown < len(replay_df):
-                                    if st.button("Load more", key=f"{key}_load"):
-                                        st.session_state.rows_shown += 5
-                                        st.rerun()
+                                    if st.session_state.rows_shown < len(replay_df):
+                                        if st.button("Load more", key=f"{key}_load"):
+                                            st.session_state.rows_shown += 5
+                                            st.rerun()
     else:
         st.error("No replays found for the selected player.")
 
@@ -411,7 +417,7 @@ selected_formats = st.multiselect(
 )
 
 num_replay = st.number_input(
-    "# Replays to Download",
+    "Replays to Download",
     min_value=1,
     max_value=5000,
     value=1000,
@@ -420,34 +426,74 @@ num_replay = st.number_input(
 
 click = st.button("Start")
 
-if click or (
-    "loaded_player" in st.session_state and
-    st.session_state.loaded_player == selected_player
-):
+should_run = (
+    click
+    or (
+        "parsed_player" in st.session_state
+        and st.session_state.loaded_player == selected_player
+        and set(st.session_state.loaded_formats) == set(selected_formats)
+    )
+)
 
-    if not selected_formats:
-        st.error("Please select at least one format.")
+if should_run:
+    if click:
+        if not selected_formats:
+            st.error("Please select at least one format.")
+        elif selected_player:
+            needs_reload = (
+                "loaded_player" not in st.session_state
+                or st.session_state.loaded_player != selected_player
+                or "loaded_formats" not in st.session_state
+                or set(st.session_state.loaded_formats) != set(selected_formats)
+            )
 
-    else:
-
-        if selected_player:
-            if "loaded_player" not in st.session_state or st.session_state.loaded_player != selected_player:
-                if os.path.exists(output_dir):
+            if needs_reload:
+                if os.path.exists(output_dir) and "loaded_player" in st.session_state and selected_player != st.session_state.loaded_player:
                     shutil.rmtree(output_dir)
+                    st.session_state.loaded_formats = []
+
+                if "loaded_formats" in st.session_state:
+                    download_formats = [fmt for fmt in selected_formats if fmt not in st.session_state.loaded_formats]
+
+                else:
+                    download_formats = selected_formats
+
+                os.makedirs(output_dir, exist_ok=True)
+                os.makedirs(replay_dir, exist_ok=True)
+                os.makedirs(tiers_dir, exist_ok=True)
+                os.makedirs(players_dir, exist_ok=True)
+
                 with st.spinner("🔄 Downloading all replays..."):
-                    for fmt in selected_formats:
-                        with st.spinner(f"🔄 Downloading replays in {fmt}..."):
-                            download_files(fmt, selected_player, replay_dir, num_replay)
+                    for fmt in download_formats:
+                        if f'{fmt}.parquet' not in os.listdir(tiers_dir):
+                            print(f'{tiers_dir}/{fmt}.parquet')
+                            with st.spinner(f"🔄 Downloading replays in {fmt}..."):
+                                download_files(fmt, selected_player, replay_dir, num_replay)
+
+                if "parsed_player" in st.session_state:
+                    parsed_player = st.session_state.parsed_player
+                else:
+                    parsed_player = None
 
                 with st.spinner("🔄 Generating stats..."):
-                    parsed_player = load_battle(replay_dir, tiers_dir, selected_player)
+                    result = load_battle(replay_dir, tiers_dir, selected_player, selected_formats)
+                    if result is not None:
+                        parsed_player = result
+
                 if os.path.exists(replay_dir):
                     shutil.rmtree(replay_dir)
+
                 load_players(formats, tiers_dir, players_dir)
+
                 st.session_state.parsed_player = parsed_player
                 st.session_state.loaded_player = selected_player
+                st.session_state.loaded_formats = selected_formats
 
-            print(f"Player {selected_player} loaded with ID: {st.session_state.parsed_player}")
-            load_single_player(st.session_state.parsed_player, selected_player, players_dir, tiers_dir)
+    if "parsed_player" in st.session_state and st.session_state.parsed_player is not None:
+        print(f"Player {selected_player} loaded with ID: {st.session_state.parsed_player}")
+        load_single_player(st.session_state.parsed_player, selected_player, players_dir, tiers_dir, selected_formats)
+
+    elif selected_formats:
+        st.error("No replays found for the selected player.")
 
 

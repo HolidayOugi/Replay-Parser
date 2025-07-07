@@ -6,7 +6,7 @@ import numpy as np
 import json
 import difflib
 
-def load_battle(input_folder, output_folder, selected_player):
+def load_battle(input_folder, output_folder, selected_player, selected_formats):
 
     def parse_log(log_text):
         lines = log_text.splitlines()
@@ -111,79 +111,83 @@ def load_battle(input_folder, output_folder, selected_player):
 
     player_name = None
 
+    if not os.path.exists(input_folder):
+        return player_name
+
     for format_name in os.listdir(input_folder):
-        format_path = os.path.join(input_folder, format_name)
-        if not os.path.isdir(format_path):
-            continue
-
-        json_files = [f for f in os.listdir(format_path) if f.endswith(".json")]
-        if not json_files:
-            continue
-
-        all_data = []
-        for filename in tqdm(json_files, desc=f"Parsing {format_name}"):
-            filepath = os.path.join(format_path, filename)
-            try:
-                with open(filepath, "r", encoding="utf-8") as f:
-                    data = json.load(f)
-                    if isinstance(data, dict) and "log" in data and "players" in data and "uploadtime" in data:
-                        all_data.append({
-                            "id": os.path.splitext(filename)[0],
-                            "log": data["log"],
-                            "players": data["players"],
-                            "rating": data["rating"],
-                            "uploadtime": data["uploadtime"]
-                        })
-            except Exception as e:
-                print(f"Errore in {filename}: {e}")
+        if format_name in selected_formats:
+            format_path = os.path.join(input_folder, format_name)
+            if not os.path.isdir(format_path):
                 continue
 
-        if not all_data:
-            continue
+            json_files = [f for f in os.listdir(format_path) if f.endswith(".json")]
+            if not json_files:
+                continue
 
-        df = pd.DataFrame(all_data)
+            all_data = []
+            for filename in tqdm(json_files, desc=f"Parsing {format_name}"):
+                filepath = os.path.join(format_path, filename)
+                try:
+                    with open(filepath, "r", encoding="utf-8") as f:
+                        data = json.load(f)
+                        if isinstance(data, dict) and "log" in data and "players" in data and "uploadtime" in data:
+                            all_data.append({
+                                "id": os.path.splitext(filename)[0],
+                                "log": data["log"],
+                                "players": data["players"],
+                                "rating": data["rating"],
+                                "uploadtime": data["uploadtime"]
+                            })
+                except Exception as e:
+                    print(f"Errore in {filename}: {e}")
+                    continue
 
-        print(f"Elaborating {format_name}")
+            if not all_data:
+                continue
 
-        df['uploadtime'] = pd.to_datetime(df['uploadtime'], unit='s')
-        df['players'] = df['players'].apply(normalize_players)
-        df['player1'] = df['players'].apply(lambda x: x[0] if len(x) > 0 else None)
-        df['player2'] = df['players'].apply(lambda x: x[1] if len(x) > 1 else None)
+            df = pd.DataFrame(all_data)
 
-        sets_of_players = df.apply(lambda row: {row['player1'].lower(), row['player2'].lower()}, axis=1)
-        common_players = set.intersection(*sets_of_players)
-        if common_players:
-            if len(common_players) == 1:
-                player_name = common_players.pop()
+            print(f"Elaborating {format_name}")
+
+            df['uploadtime'] = pd.to_datetime(df['uploadtime'], unit='s')
+            df['players'] = df['players'].apply(normalize_players)
+            df['player1'] = df['players'].apply(lambda x: x[0] if len(x) > 0 else None)
+            df['player2'] = df['players'].apply(lambda x: x[1] if len(x) > 1 else None)
+
+            sets_of_players = df.apply(lambda row: {row['player1'].lower(), row['player2'].lower()}, axis=1)
+            common_players = set.intersection(*sets_of_players)
+            if common_players:
+                if len(common_players) == 1:
+                    player_name = common_players.pop()
+                else:
+                    matches = difflib.get_close_matches(selected_player, common_players, n=1, cutoff=0)
+                    player_name = matches[0] if matches else next(iter(common_players))
             else:
-                matches = difflib.get_close_matches(selected_player, common_players, n=1, cutoff=0)
-                player_name = matches[0] if matches else next(iter(common_players))
-        else:
-            player1_counts = df['player1'].value_counts()
-            player2_counts = df['player2'].value_counts()
+                player1_counts = df['player1'].value_counts()
+                player2_counts = df['player2'].value_counts()
 
-            total_counts = player1_counts.add(player2_counts, fill_value=0)
+                total_counts = player1_counts.add(player2_counts, fill_value=0)
 
-            if not total_counts.empty:
-                player_name = total_counts.idxmax()
-            else:
-                player_name = None
+                if not total_counts.empty:
+                    player_name = total_counts.idxmax()
+                else:
+                    player_name = None
 
 
-        print(f"Selected player: {player_name}")
+            print(f"Selected player: {player_name}")
 
-        parsed = df['log'].progress_map(parse_log)
-        df_new = pd.DataFrame(parsed.tolist(),
-                              columns=['Winner', 'Forfeit', 'Team 1', 'Team 2', 'Turns', '# Switches 1', '# Switches 2'])
+            parsed = df['log'].progress_map(parse_log)
+            df_new = pd.DataFrame(parsed.tolist(),
+                                  columns=['Winner', 'Forfeit', 'Team 1', 'Team 2', 'Turns', '# Switches 1', '# Switches 2'])
 
-        df = df.drop(columns=['log', 'players'], errors='ignore')
-        df['format'] = format_name
-        df = pd.concat([df, df_new], axis=1)
+            df = df.drop(columns=['log', 'players'], errors='ignore')
+            df['format'] = format_name
+            df = pd.concat([df, df_new], axis=1)
 
-        os.makedirs(output_folder, exist_ok=True)
-        output_filename = f"{format_name}.parquet"
-        output_path = os.path.join(output_folder, output_filename)
+            os.makedirs(output_folder, exist_ok=True)
+            output_filename = f"{format_name}.parquet"
+            output_path = os.path.join(output_folder, output_filename)
 
-        df.to_parquet(output_path, index=False)
+            df.to_parquet(output_path, index=False)
 
     return player_name
