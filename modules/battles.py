@@ -109,6 +109,8 @@ def load_battle(input_folder, output_folder, selected_player):
             return [p.strip('\'" ').strip() for p in parts]
         return []
 
+    player_name = None
+
     for format_name in os.listdir(input_folder):
         format_path = os.path.join(input_folder, format_name)
         if not os.path.isdir(format_path):
@@ -150,7 +152,6 @@ def load_battle(input_folder, output_folder, selected_player):
 
         sets_of_players = df.apply(lambda row: {row['player1'].lower(), row['player2'].lower()}, axis=1)
         common_players = set.intersection(*sets_of_players)
-        player_name = None
         if common_players:
             if len(common_players) == 1:
                 player_name = common_players.pop()

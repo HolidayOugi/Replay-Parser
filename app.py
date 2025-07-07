@@ -425,25 +425,29 @@ if click or (
     st.session_state.loaded_player == selected_player
 ):
 
+    if not selected_formats:
+        st.error("Please select at least one format.")
 
-    if selected_player:
-        if "loaded_player" not in st.session_state or st.session_state.loaded_player != selected_player:
-            if os.path.exists(output_dir):
-                shutil.rmtree(output_dir)
-            with st.spinner("🔄 Downloading all replays..."):
-                for fmt in selected_formats:
-                    with st.spinner(f"🔄 Downloading replays in {fmt}..."):
-                        download_files(fmt, selected_player, replay_dir, num_replay)
+    else:
 
-            with st.spinner("🔄 Generating stats..."):
-                parsed_player = load_battle(replay_dir, tiers_dir, selected_player)
-            if os.path.exists(replay_dir):
-                shutil.rmtree(replay_dir)
-            load_players(formats, tiers_dir, players_dir)
-            st.session_state.parsed_player = parsed_player
-            st.session_state.loaded_player = selected_player
+        if selected_player:
+            if "loaded_player" not in st.session_state or st.session_state.loaded_player != selected_player:
+                if os.path.exists(output_dir):
+                    shutil.rmtree(output_dir)
+                with st.spinner("🔄 Downloading all replays..."):
+                    for fmt in selected_formats:
+                        with st.spinner(f"🔄 Downloading replays in {fmt}..."):
+                            download_files(fmt, selected_player, replay_dir, num_replay)
 
-        print(f"Player {selected_player} loaded with ID: {st.session_state.parsed_player}")
-        load_single_player(st.session_state.parsed_player, selected_player, players_dir, tiers_dir)
+                with st.spinner("🔄 Generating stats..."):
+                    parsed_player = load_battle(replay_dir, tiers_dir, selected_player)
+                if os.path.exists(replay_dir):
+                    shutil.rmtree(replay_dir)
+                load_players(formats, tiers_dir, players_dir)
+                st.session_state.parsed_player = parsed_player
+                st.session_state.loaded_player = selected_player
+
+            print(f"Player {selected_player} loaded with ID: {st.session_state.parsed_player}")
+            load_single_player(st.session_state.parsed_player, selected_player, players_dir, tiers_dir)
 
 
