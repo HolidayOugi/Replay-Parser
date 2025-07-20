@@ -21,6 +21,8 @@ def download_files(readable_format, player, output_dir, max_replays):
         "ZU": "zu",
         "PU": "pu",
         "ANYTHINGGOES": "anythinggoes",
+        "LC": "lc",
+        "MONOTYPE": "monotype"
     }
 
     def fetch(url):

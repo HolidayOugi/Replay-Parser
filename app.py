@@ -27,6 +27,13 @@ st.title("👤 Replay Parser")
 if 'rows_shown' not in st.session_state:
     st.session_state.rows_shown = 5
 
+if 'pokemon_shown' not in st.session_state:
+    st.session_state.pokemon_shown = 6
+
+def reset_state():
+    st.session_state.rows_shown = 5
+    st.session_state.pokemon_shown = 6
+
 @st.cache_data
 def get_player_data(file_path, selected_player):
     players_df = pd.read_parquet(file_path)
@@ -144,67 +151,83 @@ def load_heatmap(row, format_df, selected_mode, selected_format):
         plt.tight_layout()
         st.pyplot(fig, use_container_width=True)
 
-@st.cache_data
 def load_pokemon(row, selected_format):
-    st.markdown(f"### Top 6 Most Used Pokémon by {row['name']} in {selected_format}")
 
     pokemon_df = pd.read_csv('./assets/pokemon_stats.csv')
+
+    if isinstance(row['pokemon_used'], str):
+        row['pokemon_used'] = eval(row['pokemon_used'])
+
     usage_df = pd.DataFrame(row['pokemon_used'].items(), columns=['pokemon', 'count'])
     usage_df['percent'] = usage_df['count'] / row['played'] * 100
     usage_df = usage_df.sort_values(by='percent', ascending=False)
     total_df = pd.merge(usage_df, pokemon_df, on='pokemon')
-    total_df = total_df.head(6)
+    new_total_df = total_df.head(st.session_state.pokemon_shown)
 
-    col1, col2, col3, col4, col5, col6 = st.columns([3, 3, 3, 3, 3, 3])
-    cols = [col1, col2, col3, col4, col5, col6]
+    num_pokemon = min(len(new_total_df), st.session_state.pokemon_shown)
 
-    for i, col in enumerate(cols):
-        if i < len(total_df):
-            with col:
-                row_p = total_df.take([i])
-                gen = selected_format.split(']')[0][1:]
-                gen_number = int(gen.split()[1])
-                if gen_number < 6:
-                    gen_path = gen
-                else:
-                    gen_path = 'HOME'
-                pdex = row_p['Pdex'].iloc[0]
-                image_path = f"./assets/{gen_path}/{pdex}.png"
-                if not os.path.exists(image_path) and '-' in pdex:
-                    pdex = pdex.split('-')[0]
+    st.markdown(f"### Top {num_pokemon} Most Used Pokémon by {row['name']} in {selected_format}")
+
+
+    for row_start in range(0, len(new_total_df), 6):
+        cols = st.columns([3, 3, 3, 3, 3, 3])
+        for i, col in enumerate(cols):
+            idx = row_start + i
+            if idx < len(new_total_df):
+                row_p = new_total_df.iloc[[idx]]
+                with col:
+                    gen = selected_format.split(']')[0][1:]
+                    gen_number = int(gen.split()[1])
+                    if gen_number < 6:
+                        gen_path = gen
+                    else:
+                        gen_path = 'HOME'
+                    pdex = row_p['Pdex'].iloc[0]
                     image_path = f"./assets/{gen_path}/{pdex}.png"
-                image = Image.open(image_path)
-                image = image.resize((128, 128))
-                st.image(image, width=128)
-                name = row_p['pokemon'].iloc[0]
-                st.markdown(name)
-                type1 = row_p['Type 1'].iloc[0]
-                type2 = row_p['Type 2'].iloc[0]
-                if gen_number < 6:
-                    if type1 == 'Fairy' or type2 == 'Fairy':
-                        old_types = pd.read_csv('./assets/old_types.csv')
-                        old_row = old_types[old_types['pokemon'] == name]
-                        type1 = old_row['Type 1'].iloc[0]
-                        type2 = old_row['Type 2'].iloc[0]
-                    image1 = Image.open(f"./assets/icons/old/{type1.lower()}.png")
-                    image1 = image1.resize((192, 64))
-                    st.image(image1, width=64)
-                    if not pd.isna(type2) and type2 != "":
-                        image2 = Image.open(f"./assets/icons/old/{type2.lower()}.png")
-                        image2 = image2.resize((192, 64))
-                        st.image(image2, width=64)
-                else:
-                    image1 = Image.open(f"./assets/icons/new/{type1.lower()}.png")
-                    image1 = image1.resize((500, 120))
-                    st.image(image1, width=120)
-                    if not pd.isna(type2) and type2 != "":
-                        image2 = Image.open(f"./assets/icons/new/{type2.lower()}.png")
-                        image2 = image2.resize((500, 120))
-                        st.image(image2, width=120)
-                st.markdown(f'Usage: {'%.2f' % (row_p['percent'].iloc[0])}%')
-        else:
-            with col:
-                st.empty()
+                    if not os.path.exists(image_path):
+                        pdex = pdex.split('-')[0]
+                        new_image_path = f"./assets/{gen_path}/{pdex}.png"
+                        image_path = new_image_path
+                    image = Image.open(image_path)
+                    image = image.resize((128, 128))
+                    st.image(image, width=128)
+                    name = row_p['pokemon'].iloc[0]
+                    st.markdown(name)
+                    type1 = row_p['Type 1'].iloc[0]
+                    type2 = row_p['Type 2'].iloc[0]
+                    if gen_number < 6:
+                        if type1 == 'Fairy' or type2 == 'Fairy':
+                            old_types = pd.read_csv('./assets/old_types.csv')
+                            old_row = old_types[old_types['pokemon'] == name]
+                            type1 = old_row['Type 1'].iloc[0]
+                            type2 = old_row['Type 2'].iloc[0]
+                        type1_path = f"./assets/icons/old/{type1.lower()}.png"
+                        image1 = Image.open(type1_path)
+                        image1 = image1.resize((192, 64))
+                        st.image(image1, width=64)
+                        if not pd.isna(type2) and type2 != "":
+                            type2_path = f"./assets/icons/old/{type2.lower()}.png"
+                            image2 = Image.open(type2_path)
+                            image2 = image2.resize((192, 64))
+                            st.image(image2, width=64)
+                    else:
+                        type1_path = f"./assets/icons/new/{type1.lower()}.png"
+                        image1 = Image.open(type1_path)
+                        image1 = image1.resize((500, 120))
+                        st.image(image1, width=120)
+                        if not pd.isna(type2) and type2 != "":
+                            type2_path = f"./assets/icons/new/{type2.lower()}.png"
+                            image2 = Image.open(type2_path)
+                            image2 = image2.resize((500, 120))
+                            st.image(image2, width=120)
+                    st.markdown(f'Usage: {'%.2f' % (row_p['percent'].iloc[0])}%')
+            else:
+                with col:
+                    st.empty()
+    if st.session_state.pokemon_shown < len(usage_df):
+        if st.button("Load more", key="load_more_button"):
+            st.session_state.pokemon_shown += 6
+            st.rerun()
 
 @st.cache_data
 def load_replays(matches_df_raw, start_date, end_date):
@@ -396,7 +419,7 @@ if "user_id" not in st.session_state:
 user_dir = os.path.join("user_data", st.session_state.user_id)
 os.makedirs(user_dir, exist_ok=True)
 
-selected_player = st.text_input("Search for a player", value="", placeholder="Enter player name")
+selected_player = st.text_input("Search for a player", value="", placeholder="Enter player name", on_change=reset_state)
 
 
 
@@ -495,5 +518,3 @@ if should_run:
 
     elif selected_formats:
         st.error("No replays found for the selected player.")
-
-
